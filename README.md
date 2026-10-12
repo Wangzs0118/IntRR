@@ -1,163 +1,85 @@
-# IntRR: A Framework for Integrating SID Redistribution and Length Reduction
+# IntRR: Integrating SID-Guided Codeword Reweighting and Sequence Compression for Generative Recommendation
 
-<div align="center">
-Zesheng Wang¹, Longfei Xu¹†, Weidong Deng, Huimin Yan, Kaikui Liu, Xiangxiang Chu
+IntRR integrates SID-guided codeword reweighting and sequence compression for generative recommendation. Under fixed Stage-1 SID supervision, its Recursive-Assignment Network (RAN) learns item-specific codeword weights using UID guidance while preserving the original SID targets. Each historical item is represented by one backbone token, and autoregressive target-SID decoding is handled by the lightweight RAN outside the backbone.
 
-<br>
-<br>
-AMAP, Alibaba Group
+During item-side training, RAN uses a straight-through estimator: the forward pass selects a codeword, while gradients flow through the soft weighted combination. This implementation detail does not change the fixed SID supervision targets.
 
-<br>
+Experiments in the paper evaluate the module across three Amazon datasets, multiple backbones, and quantizers under matched comparison settings. Improvements vary across configurations; the results do not claim uniform gains or superiority over all standalone methods.
 
-¹Equal contribution. &nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; †Corresponding author and project lead.
+## Source archive
 
-[![Paper Page](https://img.shields.io/badge/Paper-Arxiv-red)](https://arxiv.org/abs/2602.20704)
+Download and extract [IntRR-source.zip](IntRR-source.zip), then run the commands below from the extracted `IntRR/` directory. The archive contains source code, configuration files, dependencies, and license notices. Model weights and datasets are not included.
 
-</div>
+## Environment
 
-## 📖 Overview
-We introduce **IntRR**, a novel generative recommendation (GR) framework designed to break the **representation ceiling** and **computational bottlenecks** of current Semantic ID (SID)-based systems. Within a two-stage paradigm (Semantic Indexing &Generative Learning), IntRR optimizes Stage 2 by internalizing the hierarchical and flattened SIDs into the backbone, achieving deep collaborative-semantic integration while maintaining a constant one-token-per-item complexity.
+Use a dedicated Python 3.10 environment on Linux with CUDA-compatible GPUs and Bash 4 or later. The dependency file pins PyTorch 2.6.0 with CUDA 12.4 and the Lightning, Transformers, and TensorFlow dependencies used by this pipeline.
 
-## 💡 IntRR: Core Framework
+```bash
+pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu124
+```
 
-<p align="center">
-  <img width="90%" alt="IntRR_Framework" src="./refs/pipeline.png" /> 
-</p>
+## 1. Prepare the Data
 
+Prepare the Amazon Beauty, Sports, or Toys data using the [GRID data preparation workflow](https://github.com/snap-research/GRID). The experiment configurations read TFRecord files from the following directories, shown here for Sports:
 
-The core of IntRR is the **Recursive-Assignment Network (RAN)**, which functions as a differentiable bridge between collaborative signals and semantic structures through two key mechanisms:
-
-*   **Adaptive SID Redistribution**: Utilizes item's Unique IDs (UIDs) as collaborative signals to dynamically refine semantic weights. This mechanism aligns content-based identifiers from Stage 1 with recommendation goals, breaking the "static ceiling" of traditional SIDs.
-*   **Structural Length Reduction**: Internalizes the item's hierarchical navigation of SIDs within a recursive path. It reduces backbone's sequence length to a single token per item, eliminating multi-step inference bottleneck and significantly enhancing system throughput.
-
-
-## 📊 Performance & Efficiency
-
-IntRR yields substantial improvements in both recommendation accuracy and system scalability across multiple benchmarks.
-
-### 1. Recommendation Accuracy
-Overall performance comparison across diverse indexing methods (**RK-Means, VQ-VAE, RQ-VAE**) and backbones (**Transformer, HSTU**). IntRR consistently achieves superior recommendation accuracy and outperforms representative generative baselines.
-
-<p align="center">
-<img width="90%" alt="Overall_Performance" src="./refs/tab_performance.png" /> 
-</p>
-
-### 2. Efficiency & Complexity
-Efficiency comparison in terms of training throughput, memory consumption, and inference latency. By bypassing SID flattening and the multi-pass inference bottleneck, IntRR delivers significant gains in system scalability.
-
-<p align="center">
-  <img width="50%" alt="Training_Efficiency" src="./refs/tab_efficiency.png" /> 
-</p>
-
-  <img width="50%" alt="Inference_Latency" src="./refs/tab_infer.png" />
-
-## ✨ Visualizing SID Redistribution
-Our analysis demonstrates that RAN adaptively steers item representations. Even for items sharing identical initial SIDs, IntRR triggers **semantic weight redistribution** based on collaborative interaction patterns, yielding more refined and unique item embeddings.
-
-  <img width="35%" alt="visualization" src="./refs/visual_redistribution.png" />
-
-## 📂 Repository Structure
 ```text
-IntRR/
-├── configs/                 # Configuration files
-│   ├── callbacks/          # PyTorch Lightning callbacks
-│   ├── experiment/         # Experiment configurations (training/inference)
-│   ├── extras/             # Extra configurations
-│   ├── logger/             # Logging configurations
-│   ├── paths/              # Path configurations
-│   └── trainer/            # Trainer configurations
-├── refs/                   # Reference images and figures
-├── src/                    # Source code
-│   ├── components/         # Core components
-│   │   ├── clustering_initializers.py
-│   │   ├── distance_functions.py
-│   │   ├── eval_metrics.py
-│   │   ├── loss_functions.py
-│   │   ├── optimizer.py
-│   │   ├── quantization_strategies.py
-│   │   ├── scheduler.py
-│   │   └── training_loop_functions.py
-│   ├── models/             # Model implementations
-│   │   ├── components/     # Model components
-│   │   └── modules/        # Model modules
-│   ├── modules/            # Neural network modules
-│   │   └── clustering/     # Clustering algorithms
-│   └── utils/              # Utility functions
-├── gen_sid.sh              # Script to generate Semantic IDs
-├── run_intrr.sh            # Script to run IntRR training
-├── run_tiger.sh            # Script to run TIGER baseline
-├── requirements.txt        # Python dependencies
-└── README.md               # This file
+data/amazon_data/sports/
+├── items/          # Item IDs and text for semantic embedding generation
+├── training/       # Training interaction sequences
+├── evaluation/     # Validation interaction sequences
+└── testing/        # Test interaction sequences
 ```
-## 📦 Installation
 
-  
+Item records provide `id` and `text`; sequence records provide `user_id` and `sequence_data`. Keep item IDs consistent across item records, interaction sequences, embeddings, and SID mappings. Replace `sports` with `beauty` or `toys` when using another supported dataset.
 
-### Prerequisites
+The datasets, pretrained model weights, and generated embedding/SID artifacts are not bundled.
 
-- Python 3.10+
+## 2. Generate Semantic IDs
 
-- CUDA-compatible GPU (recommended)
-
-  
-
-## 🎯 Quick Start
-
-  
-
-### Prerequisites
-
-  
-
-For environment setup and data preparation, please refer to the [GRID (Generative Recommendation with Semantic IDs)  repository](https://github.com/snap-research/GRID).
-
-  
-
-### 1. Generate Semantic IDs
-
-  
-
-Generate Semantic IDs and Update `dataset_config.sh`
-
-  
+The generation script extracts item embeddings, trains a semantic indexing model, and exports item-to-SID mappings. The default embedding model is `google/flan-t5-xl`, with 2,048-dimensional embeddings, three indexing hierarchies, and a codebook width of 128.
 
 ```bash
-
-sh  gen_sid.sh  --datasets  sports  --sid-methods  rkmeans
-
+CUDA_VISIBLE_DEVICES=0 bash gen_sid.sh --datasets sports --sid-methods rkmeans
 ```
 
-  
+Use `--datasets` and `--sid-methods` with comma-separated values to run other combinations. SID generation accepts `rkmeans`, `rqvae`, and `rvq`; the recommendation training scripts use `vqvae` for the last option.
 
-### 2. Train IntRR with Semantic IDs
+The script prints the generated embedding and SID paths. Both artifacts use the filename `pickle/merged_predictions_tensor.pt` under their respective run directories in `logs/`.
 
-  
+Before training, update [configs/dataset_config.sh](configs/dataset_config.sh):
 
-Train the recommendation model using the learned semantic IDs:
+- Set `DATASET_EMBEDDING_PATHS` to the generated item embedding file.
+- Update `get_sid_path` to resolve to the generated SID file for each dataset/method pair.
+- Check `DATASET_ITEM_COUNTS` against the prepared item vocabulary.
 
-  
+The checked-in paths refer to earlier runs; `gen_sid.sh` does not update them automatically. Keep the generated SID dimensions and model settings aligned. The default indexing export appends a collision-disambiguation code to the three learned levels; the IntRR training configuration expects four SID levels.
+
+## 3. Train and Evaluate IntRR
+
+After configuring the artifact paths, start one experiment:
 
 ```bash
-
-sh  run_intrr.sh  --datasets  sports  --seeds  42  --sid-type  rkmeans
-
+CUDA_VISIBLE_DEVICES=0 bash run_intrr.sh \
+  --datasets sports --seeds 42 --sid-type rkmeans --max-parallel 1
 ```
 
-## 🙏 Acknowledgments
+The launcher uses [configs/experiment/intrr_train_flat.yaml](configs/experiment/intrr_train_flat.yaml). The checked-in example configuration uses a history length of 20 items, beam-search generation with prefix checking, and separate training, validation, and test splits. The paper uses up to 32 historical items for IntRR, default beam width 10, and alignment-loss weight 0.1; configure these settings explicitly rather than treating the example defaults as the paper configuration. It selects the best checkpoint by `val/recall@10` and runs test evaluation after training.
 
-This work builds upon the [GRID](https://github.com/snap-research/GRID) framework by Snap Research. We thank the GRID team for their open-source contributions to the generative recommendation community, which provides a solid foundation for SID-based generative recommendation research.
+Use `--datasets`, `--seeds`, and `--sid-type` with comma-separated values for multiple experiments. `--max-parallel` controls the number of concurrent experiments, not the number of GPUs. Its default is four; each experiment's trainer uses all visible GPUs. Set `CUDA_VISIBLE_DEVICES` to select the devices and use `--max-parallel 1` when experiments share them. Model, batch-size, and trainer settings are defined in the experiment YAML.
 
-## 📚 Citation
+Launcher logs are written to `logs/intrr_<timestamp>/`. Hydra stores each training run under `logs/train/runs/intrr/<run-id>/`, including checkpoints, CSV metrics, and TensorBoard logs. The checkpoint callback retains the best checkpoint; it does not configure a separate last-epoch checkpoint.
 
-If you find our paper and code helpful for your research, please consider starring our repository ⭐ and citing our work ✏️.
+## 4. Run the TIGER Baseline
 
-```bibtex
-@misc{wang2026intrrframeworkintegratingsid,
-      title={IntRR: A Framework for Integrating SID Redistribution and Length Reduction}, 
-      author={Zesheng Wang and Longfei Xu and Weidong Deng and Huimin Yan and Kaikui Liu and Xiangxiang Chu},
-      year={2026},
-      eprint={2602.20704},
-      archivePrefix={arXiv},
-      primaryClass={cs.IR},
-      url={https://arxiv.org/abs/2602.20704}, 
-}
+The TIGER launcher uses the same prepared data and SID paths:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 bash run_tiger.sh \
+  --datasets sports --seeds 42 --sid-type rkmeans --max-parallel 1
+```
+
+Its experiment settings are in [configs/experiment/tiger_train_flat.yaml](configs/experiment/tiger_train_flat.yaml). Launcher logs are written to `logs/tiger_<timestamp>/`. Use matching datasets, SID artifacts, and evaluation settings when comparing it with IntRR.
+
+## Acknowledgments
+
+This implementation builds on [GRID](https://github.com/snap-research/GRID) by Snap Research. We thank the GRID team for open-sourcing the semantic indexing and generative recommendation framework. See [LICENSE](LICENSE) and [third-party notices](notices.txt) for the applicable terms and attributions.
