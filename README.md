@@ -63,7 +63,7 @@ CUDA_VISIBLE_DEVICES=0 bash run_intrr.sh \
   --datasets sports --seeds 42 --sid-type rkmeans --max-parallel 1
 ```
 
-The launcher uses [configs/experiment/intrr_train_flat.yaml](configs/experiment/intrr_train_flat.yaml). The checked-in example configuration uses a history length of 20 items, beam-search generation with prefix checking, and separate training, validation, and test splits. The paper uses up to 32 historical items for IntRR, default beam width 10, and alignment-loss weight 0.1; configure these settings explicitly rather than treating the example defaults as the paper configuration. It selects the best checkpoint by `val/recall@10` and runs test evaluation after training.
+The launcher uses [configs/experiment/intrr_train_flat.yaml](configs/experiment/intrr_train_flat.yaml). The checked-in example configuration uses a history length of 32 items, beam-search generation with prefix checking, and separate training, validation, and test splits. The paper uses up to 32 historical items for IntRR, default beam width 10, and alignment-loss weight 0.1; configure these settings explicitly rather than treating the example defaults as the paper configuration. It selects the best checkpoint by `val/recall@10` and runs test evaluation after training.
 
 Use `--datasets`, `--seeds`, and `--sid-type` with comma-separated values for multiple experiments. `--max-parallel` controls the number of concurrent experiments, not the number of GPUs. Its default is four; each experiment's trainer uses all visible GPUs. Set `CUDA_VISIBLE_DEVICES` to select the devices and use `--max-parallel 1` when experiments share them. Model, batch-size, and trainer settings are defined in the experiment YAML.
 
