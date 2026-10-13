@@ -13,11 +13,11 @@ sid_type: ???  # rkmeans, rqvae, or vqvae
 # Fixed optimal parameters
 num_hierarchies: 4
 embedding_dim: 2048
-sequence_length: 20
+sequence_length: 33
 item_embedding_dim: 512
 codebook_activation: ReLU
 codebook_hidden_dim: 512
-reconstruction_loss_weight: 0.0
+reconstruction_loss_weight: 0.1
 llm_embedding_dim: 16
 user_vec_mode: 1
 should_add_bos_token: false
