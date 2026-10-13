@@ -6,9 +6,9 @@ During item-side training, RAN uses a straight-through estimator: the forward pa
 
 Experiments in the paper evaluate the module across three Amazon datasets, multiple backbones, and quantizers under matched comparison settings. Improvements vary across configurations; the results do not claim uniform gains or superiority over all standalone methods.
 
-## Source archive
+## Source code
 
-Download and extract [IntRR-source.zip](IntRR-source.zip), then run the commands below from the extracted `IntRR/` directory. The archive contains source code, configuration files, dependencies, and license notices. Model weights and datasets are not included.
+The source tree can be browsed online or downloaded as a ZIP. Run the commands below from the directory containing `requirements.txt`, `gen_sid.sh`, and `run_intrr.sh`. Source code, configurations, dependencies, and license notices are included; datasets and model weights are not bundled.
 
 ## Environment
 
@@ -82,4 +82,4 @@ Its experiment settings are in [configs/experiment/tiger_train_flat.yaml](config
 
 ## Acknowledgments
 
-This implementation builds on [GRID](https://github.com/snap-research/GRID) by Snap Research. We thank the GRID team for open-sourcing the semantic indexing and generative recommendation framework. See [LICENSE](LICENSE) and [third-party notices](notices.txt) for the applicable terms and attributions.
+This implementation builds on [GRID](https://github.com/snap-research/GRID) by Snap Research. We thank the GRID team for open-sourcing the semantic indexing and generative recommendation framework. See [LICENSE](LICENSE) and third-party notices (`notices.txt` in the source ZIP; `notices.txt.gz` in the online tree) for the applicable terms and attributions.
