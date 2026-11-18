@@ -1,8 +1,8 @@
-# IntRR: Integrating SID-Guided Codeword Reweighting and Sequence Compression for Generative Recommendation
+# IntRR: A Framework for Integrating SID Redistribution and Length Reduction
 
-IntRR integrates SID-guided codeword reweighting and sequence compression for generative recommendation. Under fixed Stage-1 SID supervision, its Recursive-Assignment Network (RAN) learns item-specific codeword weights using UID guidance while preserving the original SID targets. Each historical item is represented by one backbone token, and autoregressive target-SID decoding is handled by the lightweight RAN outside the backbone.
+IntRR integrates SID redistribution and length reduction for generative recommendation. Its Recursive-Assignment Network (RAN) uses item-specific unique IDs (UIDs) to adapt codeword weights to the recommendation objective. The original semantic IDs (SIDs) anchor this redistribution and remain fixed as prediction targets. RAN combines the selected codewords into one token per historical item, reducing the history length processed by the backbone. After one backbone pass, the same RAN decodes the target SID level by level from the user state.
 
-During item-side training, RAN uses a straight-through estimator: the forward pass selects a codeword, while gradients flow through the soft weighted combination. This implementation detail does not change the fixed SID supervision targets.
+During item-side training, RAN uses a straight-through estimator: the forward pass selects the highest-weight codeword at each level, while gradients flow through the soft weighted combination to train all codeword weights. The alignment loss anchors these weights to the original semantic hierarchy, while recommendation signals adapt them to observed interactions.
 
 Experiments in the paper evaluate the module across three Amazon datasets, multiple backbones, and quantizers under matched comparison settings. Improvements vary across configurations; the results do not claim uniform gains or superiority over all standalone methods.
 

@@ -57,7 +57,7 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
             **kwargs,
     ) -> None:
         """
-        Initialize the IntRRDecoderOnly module for semantic ID generation.
+        Initialize IntRR for SID redistribution and length-reduced prediction.
 
         Args:
             top_k_for_generation: Number of top-k candidates for generation.
@@ -80,15 +80,15 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
             codebook_hidden_dim: Hidden dimension for codebook MLP.
             llm_embedding_dim: Dimension of LLM embeddings.
             user_vec_mode: User vector computation mode (1, 2, or 3).
-            reconstruction_loss_weight: Weight for reconstruction loss (default: 0.1).
+            reconstruction_loss_weight: Weight for the SID alignment loss (legacy configuration name; default: 0.1).
             should_add_bos_token: Whether to add BOS token.
             beamsearch: Whether to use beam search for generation.
             emb_projection_flag: Whether to project embeddings before codebook lookup.
-            u_groudtruth: Whether to use ground truth for user embeddings during training.
-            i_groudtruth: Whether to use ground truth for item embeddings during training.
+            u_groudtruth: Whether to condition target-SID decoding on preceding ground-truth codewords.
+            i_groudtruth: Whether to condition history encoding on preceding fixed-SID codewords instead of model-selected codewords.
             split_codebook_mlp: Whether to use separate MLP for input/output tasks.
-            rec_loss_step: Step to disable reconstruction loss.
-            rec_level: Number of levels to compute reconstruction loss.
+            rec_loss_step: Step to disable the SID alignment loss (legacy configuration name).
+            rec_level: Number of SID levels included in the alignment loss.
             **kwargs: Additional arguments passed to parent class.
         """
         # Initialize prefix validation cache before calling super().__init__
@@ -283,8 +283,8 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
         self.beamsearch = beamsearch
         self.u_groudtruth = u_groudtruth
         self.i_groudtruth = i_groudtruth
-        self.rec_loss_step = rec_loss_step  # When not None and global_step > rec_loss_step, disable reconstruction_loss
-        self.rec_level = rec_level  # When not None, only compute reconstruction loss for first min(rec_level, L) levels
+        self.rec_loss_step = rec_loss_step  # Disable SID alignment after this step when configured.
+        self.rec_level = rec_level  # When set, compute SID alignment over the first min(rec_level, L) levels.
 
         self._all_items_cache = {'is_valid': False}
 
@@ -793,7 +793,7 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
                 task_type="input"
             )
 
-            # Compute reconstruction loss: compare predicted semantic IDs with ground truth
+            # SID alignment loss: anchor history codeword weights to the fixed SID labels.
             if input_sids is not None:
                 # Determine current stage: training, validation, or testing
                 # TrainerFn.FITTING includes training + validation, need to distinguish by training state
@@ -819,7 +819,7 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
                     attention_mask,
                     stage=stage
                 )
-                # Save reconstruction loss and accuracies as model attributes for logging in training_step
+                # Store SID alignment loss and accuracies under legacy attribute names for logging.
                 self.reconstruction_loss = reconstruction_loss
                 self.rec_level_accuracies = rec_level_accuracies
                 self.rec_stage = stage
@@ -1007,17 +1007,22 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
             task_type: str = "input",  # Task type: "input" or "output"
     ) -> (torch.Tensor, List[torch.Tensor], List[torch.Tensor], List[torch.Tensor], List[torch.Tensor]):
         """
-        Compress/reconstruct item_emb embeddings through multi-layer codebooks.
+        Apply the shared Recursive-Assignment Network (RAN) across SID levels.
+
+        On the item side, UID-guided codeword reweighting implements SID
+        redistribution and combines selected codewords into one history token.
+        On the prediction side, the user state conditions recursive SID decoding.
+        Fixed SIDs provide alignment supervision and remain prediction targets.
 
         Args:
-            item_emb (torch.Tensor): Input embedding vectors.
+            item_emb (torch.Tensor): UID-derived item embeddings or backbone user states.
             emb_projection_flag (bool): Whether to project embedding vectors.
-            fut_ids (Optional[torch.Tensor]): Ground truth IDs for teacher-forcing.
+            fut_ids (Optional[torch.Tensor]): Fixed SID tokens providing preceding-codeword context when teacher forcing is enabled.
             is_training (bool): Training flag (kept for backward compatibility, actual stage is determined by trainer.state.fn).
             split_mlp_flag (bool): Whether to use split MLP.
             task_type (str): Task type
-                - "input": Input side (ItemID->SID mapping, uses reconstruction loss)
-                - "output": Output side (User->SID recommendation, uses CE loss)
+                - "input": History encoding through SID redistribution, supervised by SID alignment.
+                - "output": Target-SID decoding from the user state, supervised by recommendation loss.
 
         Returns:
             output_emb (torch.Tensor): Encoded embedding vectors.
@@ -1050,7 +1055,7 @@ class IntRRDecoderOnly(SemanticIDGenerativeRecommender):
             if i == 0:
                 codebook_i_input = item_emb
             else:
-                # Codebook fusion: [prev_ground_emb, item_emb]
+                # Fuse the preceding codeword (ground truth when supplied, otherwise selected) with the input state.
                 prev_codebook = self.intrr_codebooks[i - 1]
                 if fut_ids is not None:
                     ground_emb = prev_codebook[fut_ids[:, i - 1].long()]
